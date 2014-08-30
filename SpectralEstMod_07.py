@@ -1,8 +1,21 @@
 # -*- coding: utf-8 -*-
 """
-Created on Mon Mar 31 16:59:20 2014
+Spectral estimation for nonstationary signals.[1]
 
-@author: Attilio Di Nisio
+Functions:
+- inst_phase_01: Instantaneous phase estimation
+- se_base_resampling_03: Spectral estimation by means of base resampling
+- se_phase_resampling_01: Spectral estimation by means of resampling
+
+Requires Python 3.
+
+Copyright 2014 Attilio Di Nisio
+
+[1] F. Adamo, G. Cavone, A. Di Nisio, M. Savino, M. Spadavecchia,
+“Spectral Estimation Technique for Nonstationary Signals of Power
+Systems,” in Instrumentation and Measurement Technology Conference
+(I2MTC), 2014 IEEE International, Montevideo, Uruguay, pp. 654-658,
+May 12-15 2014.
 
 History:
 
@@ -13,6 +26,7 @@ History:
 - SpectralEstMod_03 20140614.
 - SpectralEstMod_02 .
 - SpectralEstMod_01 20140331.
+- Created on Mon Mar 31 16:59:20 2014
 
 """
 import pdb; dbs =  pdb.set_trace
@@ -23,7 +37,11 @@ import scipy.optimize
 import scipy.signal
 
 def inst_phase_01(t,x,f_ref, filt_a, filt_b):
-    """Return unwrapped instantaneous phase"""
+    """Return unwrapped instantaneous phase
+    t: sampling instants vector
+    x: signal samples vector
+    f_ref: nominal frequency of fundamental, used as reference for spectral analysis
+    """
     xI = x * np.cos(2*np.pi*f_ref*t)
     xQ = x * -np.sin(2*np.pi*f_ref*t)
     xI_filt  = scipy.signal.lfilter(filt_b, filt_a,xI)
@@ -38,8 +56,13 @@ def inst_phase_01(t,x,f_ref, filt_a, filt_b):
     return x_uiphase
 
 def lp_filter_02(fs):
-    """ Filter design """
-    cut_off = 20.1
+    """ Filter design
+    fs: sampling rate
+    Returns
+    filt_b, filt_a: numerator and denominator polynomials of filter. 
+    delay_sec: filter delay [s]
+    """
+    cut_off = 20.1 #Cut off frequency [Hz]
     filt_b,filt_a = scipy.signal.butter(7, cut_off/(fs/2))
     freqz_n = 4000
     w_norm, filt_H = scipy.signal.freqz(filt_b, filt_a,freqz_n)
@@ -48,7 +71,16 @@ def lp_filter_02(fs):
     return filt_a, filt_b, w_norm, filt_H, delay_sec
     
 def se_base_resampling_03(x, gd, f_ref, delay_n, K):
-    """Spectral estimation with base resampling"""
+    """Spectral estimation with base resampling
+    x: signal samples vector size N
+    f_ref: nominal frequency of fundamental, used as reference for spectral analysis.
+    gd: vector size N, obtained as inst_phase_01()/(2*pi*f_ref).
+    delay_n: delay (in samples) of gd.
+    K: maximum harmonic order calculated.
+    
+    Returns
+    a_est spectral estimates, complex array [N x K +1]
+    """
     
     #assert(issorted(dg))
     
@@ -133,14 +165,25 @@ def dt_integr_02(x, ge, WL, WR, L, R, W, K):
 
 
 def se_phase_resampling_01(x, gd, K, t1_smpl, f_ref, WN2, t2_start, g_delay, x_f = None, use_fft = False):
-  """Spectral estimation with phase resampling
-  signal interpolation to obtain uniform sampling for tranformed time
-  t1_out: where estimate is calculated in reference U
-  a_est: estimated components
+  """Spectral estimation with phase resampling in reference system U.
+  x: signal samples vector size N
+  gd: vector size N, obtained as inst_phase_01()/(2*pi*f_ref).
+  K: maximum harmonic order calculated (effective only when use_fft == False).
+  t1_smpl: sampling instants vector
+  f_ref: nominal frequency of fundamental, used as reference for spectral analysis.
+  WN2: number of interpolated samples in the sliding window.
+  t2_start = 0.0: used for test purposes.
+  g_dalay: delay (in seconds) of gd.
+  x_f function is eventually used instead of samples x for performance comparison purposes.  
+  use_fft: True if fft implementation should be used
+  
+  Returns
+  t1_out: where estimate is calculated in reference system U
+  a_est spectral estimates, complex array [N x K1], where K1 = K if use_fft == False, K1 = WN2 otherwise.
   gd_out: estimate of g(t1_out)
   
-  NOTE x_f eventually used instead of interpolated x for performance comaprison purposes.
-  """
+  """    
+  
   W = 1/f_ref
   fs2 = f_ref * WN2
   t2 = t2_start +   np.arange( np.ceil( (gd[0]-t2_start)*fs2), 
@@ -184,7 +227,7 @@ def se_phase_integr_04(x_f, g_f, ti, N_OS, W, WN2, K, use_fft = False):
   gd caclculated with high resolution and the function x_f, i.e.
   se_phase_resampling_01(None, g_f(t), K, t, 1/W, WN2, t2_start, 0.0, x_f, False)
   with high resolution t vector. The difference is that with
-  se_phase_resampling_01 the instant to which the ouput belongs can't be
+  se_phase_resampling_01 the instant to which the output belongs can't be
   predetermined.
   """
   N = len(ti)
